@@ -6,6 +6,17 @@ from einops.layers.torch import Rearrange
 from module import Attention, PreNorm, FeedForward
 import numpy as np
 
+from datetime import datetime
+import sys, getopt
+from torch.autograd import Variable
+
+from torch.utils.data import DataLoader
+sys.path.append('/home/tr248228/RP_EvT/October/n-epic-kitchens')
+from dl_ft_1_train import ek_train, collate_fn2
+from dl_ft_1_test import ek_test, collate_fn_test
+from functions_NEK import train_accuracy, validate, train_epoch, getInputs
+
+
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
         super().__init__()
@@ -79,21 +90,44 @@ class ViViT(nn.Module):
 
         return self.mlp_head(x)
     
+
+def main(argv):
+    #img = torch.ones([1, 10, 3, 224, 224]).cuda()
+    trainKitchen, testKitchen, logFolder, note = getInputs(argv)
+    logFile = startLog(trainKitchen, testKitchen, logFolder, note)
+    num_classes = 8
+    bs = 1
+    num_epochs = 101
+
+    
+    model = ViViT(224, 16, num_classes, 10).cuda()
+    parameters = filter(lambda p: p.requires_grad, model.parameters())
+    parameters = sum([np.prod(p.size()) for p in parameters]) / 1000000
+    print('Trainable Parameters: %.3fM' % parameters)
+
+    train_dataset = ek_train(shuffle = True, trainKitchen = trainKitchen)
+    train_dataloader = DataLoader(train_dataset, batch_size=bs, shuffle=True, num_workers=8, collate_fn=collate_fn2, drop_last = True)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [20, 40, 60, 80])
     
     
+    for epoch in range(num_epochs):
+        train_epoch(model, train_dataloader, criterion, optimizer, logFile, epoch, False)
+        lr_sched.step()
+        if (epoch % 5 == 0):
+            if (epoch > -1):
+                print("ENTERING EVALUATION")
+                train_accuracy(model,epoch, logFile, trainKitchen)
+                validate(model,epoch, logFile, testKitchen)
+                print()
+
+    logFile.write("---------------------file close-------------------------------\n")
+    logFile.close()
 
 if __name__ == "__main__":
-    
-    img = torch.ones([1, 16, 3, 224, 224]).cuda()
-    
-    model = ViViT(224, 16, 100, 16).cuda()
-    parameters = filter(lambda p: p.requires_grad, model.parameters())
-    parameters = sum([np.prod(p.size()) for p in parameters]) / 1_000_000
-    print('Trainable Parameters: %.3fM' % parameters)
-    
-    out = model(img)
-    
-    print("Shape of out :", out.shape)      # [B, num_classes]
+    main(sys.argv[1:])
 
     
     
