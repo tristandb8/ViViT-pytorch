@@ -94,7 +94,7 @@ class ViViT(nn.Module):
 def main(argv):
     #img = torch.ones([1, 10, 3, 224, 224]).cuda()
     trainKitchen, testKitchen, logFolder, note = getInputs(argv)
-    logFile = startLog(trainKitchen, testKitchen, logFolder, note)
+    logFile = startLog(trainKitchen, testKitchen, logFolder, note, 'vivit')
     num_classes = 8
     bs = 1
     num_epochs = 101
@@ -109,12 +109,12 @@ def main(argv):
     train_dataloader = DataLoader(train_dataset, batch_size=bs, shuffle=True, num_workers=8, collate_fn=collate_fn2, drop_last = True)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-    lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [20, 40, 60, 80])
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [25, 50, 75])
     
     
     for epoch in range(num_epochs):
-        train_epoch(model, train_dataloader, criterion, optimizer, logFile, epoch, False)
+        model, train_dataloader, criterion, optimizer = train_epoch(model, train_dataloader, criterion, optimizer, logFile, epoch, False)
         lr_sched.step()
         if (epoch % 5 == 0):
             if (epoch > -1):
